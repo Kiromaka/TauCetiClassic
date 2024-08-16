@@ -1724,6 +1724,7 @@
 #include "code\modules\food\recipes_oven.dm"
 #include "code\modules\genetics\side_effects.dm"
 #include "code\modules\goonchat\browserOutput.dm"
+#include "code\modules\heretic\items\blades.dm"
 #include "code\modules\holiday\holidays.dm"
 #include "code\modules\holiday\special_holidays.dm"
 #include "code\modules\holiday\months\april.dm"

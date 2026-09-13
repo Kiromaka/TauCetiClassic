@@ -1,0 +1,813 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fly Brain · SS13</title>
+<style>
+  :root{
+    --bg:#0b0e13; --panel:#121722; --line:#1f2836; --ink:#d7e0ee;
+    --dim:#7f8da0; --accent:#7ee0b8; --warn:#f0b352; --hot:#ef6f6f;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.5 var(--mono);
+       padding:16px;padding-block:18px}
+  h1{font-size:15px;margin:0 0 2px;letter-spacing:.06em;text-transform:uppercase}
+  .sub{color:var(--dim);font-size:11px;margin-bottom:14px}
+  .grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+         padding:12px;min-width:0}
+  .panel h2{font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+            color:var(--dim);margin:0 0 10px;font-weight:600}
+  canvas{width:100%;display:block;image-rendering:pixelated;border-radius:6px}
+  .row{display:flex;gap:10px;align-items:center;justify-content:space-between}
+  .kv{display:flex;justify-content:space-between;gap:8px;padding:2px 0;
+      border-bottom:1px dotted var(--line);font-size:12px}
+  .kv:last-child{border-bottom:0}
+  .kv b{font-weight:600;color:var(--accent)}
+  .bar{height:9px;background:#0a0d13;border-radius:5px;overflow:hidden;flex:1;
+       border:1px solid var(--line)}
+  .bar i{display:block;height:100%;background:var(--accent);width:0%;
+         transition:width .12s linear}
+  .bar i.neg{background:var(--warn)}
+  .bar i.hot{background:var(--hot)}
+  .dnrow{display:grid;grid-template-columns:88px 1fr 78px;gap:8px;align-items:center;
+         font-size:11px;margin-bottom:5px}
+  .dnrow span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .dnrow span:last-child{text-align:right;color:var(--dim);white-space:nowrap;
+                         font-variant-numeric:tabular-nums}
+  .state{font-size:22px;letter-spacing:.04em;color:var(--accent);margin:2px 0 6px}
+  .pill{display:inline-block;padding:1px 7px;border:1px solid var(--line);
+        border-radius:99px;font-size:10px;color:var(--dim);margin-right:4px;
+        margin-bottom:4px}
+  .pill.src{border-color:var(--accent);color:var(--accent)}
+  .pill.src.fb{border-color:var(--warn);color:var(--warn)}
+  .banner{display:none;border:1px solid var(--warn);border-radius:8px;
+          padding:9px 12px;margin-bottom:12px;font-size:12px;color:var(--warn);
+          background:rgba(240,179,82,.07);line-height:1.6}
+  .banner code{color:var(--ink)}
+  .eyes{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .eyes figcaption{font-size:10px;color:var(--dim);text-align:center;margin-top:4px}
+  .warnbox{color:var(--warn);font-size:11px;margin-top:6px;min-height:16px}
+  /* Панель нисходящих: полоса центрирована на нуле и показывает z-оценку —
+     именно по ней принимается решение. Сырые герцы у разных популяций
+     отличаются на порядки, и по ним всегда "выигрывает" самая большая. */
+  .zrow{display:grid;grid-template-columns:78px 1fr 96px;gap:8px;
+        align-items:center;font-size:11px;margin-bottom:5px}
+  .zrow>span:first-child{overflow:hidden;text-overflow:ellipsis;
+        white-space:nowrap;color:var(--dim)}
+  .zrow.win>span:first-child{color:var(--accent);font-weight:600}
+  .zbar{position:relative;height:12px;background:#0a0d13;border-radius:3px;
+        border:1px solid var(--line);overflow:hidden}
+  .zbar .mid{position:absolute;left:50%;top:0;bottom:0;width:1px;
+        background:#33405a}
+  .zbar .thr{position:absolute;top:0;bottom:0;width:1px;
+        background:rgba(240,179,82,.55)}
+  .zbar .fill{position:absolute;top:1px;bottom:1px;background:var(--accent);
+        border-radius:2px;transition:left .12s linear,width .12s linear}
+  .zbar .fill.neg{background:#5d7fb5}
+  .zbar .fill.win{background:var(--hot)}
+  .znum{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .znum b{color:var(--ink);font-weight:600}
+  .znum s{color:var(--dim);text-decoration:none;font-size:10px}
+  .legend{color:var(--dim);font-size:10px;margin-top:8px;line-height:1.5}
+  .legend b{color:var(--ink);font-weight:600}
+  .wide{grid-column:1/-1}
+  .span2{grid-column:span 2}
+  @media (max-width:900px){ .wide,.span2{grid-column:auto} }
+  .d3{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .d3 figure{margin:0}
+  .d3 canvas{background:#070910;cursor:grab;image-rendering:auto}
+  .d3 canvas:active{cursor:grabbing}
+  .d3 figcaption{font-size:10px;color:var(--dim);text-align:center;margin-top:5px}
+  @media (max-width:760px){ .d3{grid-template-columns:1fr} }
+  footer{color:var(--dim);font-size:10px;margin-top:14px;line-height:1.6}
+  @media (max-width:520px){ .eyes{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+<h1>Fly Brain · Drosophila × Space Station 13</h1>
+<div class="sub" id="hdr">подключаюсь…</div>
+<div class="banner" id="banner"></div>
+
+<div class="grid">
+
+  <div class="panel span2">
+    <h2>Фасеточный глаз</h2>
+    <div class="eyes">
+      <figure style="margin:0">
+        <canvas id="hex" width="360" height="330"></canvas>
+        <figcaption>721 омматидий</figcaption>
+      </figure>
+      <figure style="margin:0">
+        <canvas id="view" width="150" height="150"></canvas>
+        <figcaption>исходный вид SS13 15×15</figcaption>
+      </figure>
+    </div>
+    <div class="warnbox" id="visnote"></div>
+  </div>
+
+  <div class="panel span2">
+    <h2>Растр спайков · выборка 1024 нейрона</h2>
+    <canvas id="raster" width="480" height="220"></canvas>
+    <div class="row" style="margin-top:8px;font-size:11px;color:var(--dim)">
+      <span id="spikeinfo">—</span><span id="clip"></span>
+    </div>
+  </div>
+
+  <div class="panel wide">
+    <h2>Мозг в трёх измерениях · тащите мышкой</h2>
+    <div class="d3">
+      <figure>
+        <canvas id="cloud" width="460" height="340"></canvas>
+        <figcaption id="cloudcap">загружаю координаты…</figcaption>
+      </figure>
+      <figure>
+        <canvas id="fly3d" width="460" height="340"></canvas>
+        <figcaption id="flycap">муха так, как выглядело бы это поведение</figcaption>
+      </figure>
+    </div>
+    <div class="legend">
+      Слева — реальные координаты сомы нейронов из выгрузки FlyWire. Тусклая
+      масса это форма мозга; цветные точки — те нейроны, за которыми следит
+      растр, и вспыхивают ровно те, что спайкнули в этом тике. Мышкой можно
+      крутить.<br>
+      Справа — та же команда, которая ушла в игру, показанная на модели мухи:
+      походка, поворот, хоботок, чистка. Это <b>отрисовка решения</b>, а не
+      физическая модель тела: суставов и сил здесь нет.
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Нисходящие нейроны · z-оценка</h2>
+    <div id="dn"></div>
+    <div class="legend">
+      Полоса — <b>z-оценка</b>: насколько канал активнее своей собственной
+      скользящей базовой линии. Именно по ней принимается решение, и только
+      её стоит читать. Янтарные засечки — пороги срабатывания, красным
+      подсвечен канал, который сейчас правит поведением.<br>
+      Серым справа — сырые герцы. Сравнивать их между каналами бессмысленно:
+      у популяции из двухсот нейронов их в разы больше, чем у популяции из
+      шести, при одинаковом смысле сигнала.
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Поведение</h2>
+    <div class="state" id="state">—</div>
+    <div id="pills"></div>
+    <canvas id="compass" width="220" height="136" style="margin-top:10px"></canvas>
+    <div id="act"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Сенсорные каналы</h2>
+    <div id="drive"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Внутренние состояния</h2>
+    <div id="inner"></div>
+    <div class="legend">
+      Ни в сенсорике, ни в моторике этого не видно, а поведение меняется
+      именно от этого: жажда открывает вкусовой канал воды, толерантность
+      к спирту ослабляет ту же дозу, тяга наверх копится в покое и
+      подскакивает от испуга, «грязь» — след от касания, по которому муха
+      выбирает, какую часть тела чистить.
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Что пришло из игры</h2>
+    <div id="percept"></div>
+    <div style="font-size:10px;color:var(--dim);margin-top:8px;line-height:1.5">
+      Сырые значения из DM, до кодирования. Если канал молчит, а тут ноль —
+      сигнал не доходит из игры; если тут не ноль, а канал пустой — дело
+      в популяции нейронов.
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Бюджет времени</h2>
+    <canvas id="perf" width="480" height="120"></canvas>
+    <div id="perfkv" style="margin-top:8px"></div>
+  </div>
+
+</div>
+
+<footer>
+  Модель: LIF по коннектому FlyWire FAFB, параметры Shiu et al., Nature 2024.
+  Раскладка омматидиев — главные компоненты координат сомы ламинарных нейронов,
+  то есть оси ретинотопии определены с точностью до поворота и отражения.
+</footer>
+
+<script>
+const $ = s => document.querySelector(s);
+// Решётка омматидиев считается прямо здесь: n_ring=15 даёт 721 фасетку —
+// столько же, сколько в моделях зрительной системы мухи. Так дашборд
+// не зависит ни от одного лишнего запроса.
+const HEX = (() => {
+  const n = 15, pts = [];
+  for(let q=-n; q<=n; q++){
+    for(let r=Math.max(-n,-q-n); r<=Math.min(n,-q+n); r++)
+      pts.push([1.5*q, Math.sqrt(3)*(r + q/2)]);
+  }
+  let m = 0; pts.forEach(p => { m = Math.max(m, Math.abs(p[0]), Math.abs(p[1])); });
+  return {pts: pts.map(p => [p[0]/m, p[1]/m]), cell: 1/m};
+})();
+let lastTick = -1, perfHist = [], rasterHist = [];
+
+// ---- цветовые шкалы -------------------------------------------------------
+function plural(n, one, few, many){
+  const a = Math.abs(n) % 100, b = a % 10;
+  if(a > 10 && a < 20) return many;
+  if(b > 1 && b < 5) return few;
+  if(b === 1) return one;
+  return many;
+}
+
+function lum(v){                       // индиго -> янтарный
+  v = Math.max(0, Math.min(1, v));
+  const t = Math.pow(v, 0.7);
+  const r = Math.round(28 + 227*t);
+  const g = Math.round(24 + 186*Math.pow(v, 1.1));
+  const b = Math.round(86 + 40*v - 66*Math.pow(v, 2.2));
+  return `rgb(${r},${g},${b})`;
+}
+
+// ---- фасеточный глаз ------------------------------------------------------
+function drawHex(vals){
+  const c = $('#hex'), ctx = c.getContext('2d');
+  const W = c.width, H = c.height;
+  ctx.fillStyle = '#080a0f'; ctx.fillRect(0,0,W,H);
+  if(!vals.length) return;
+  const R = Math.min(W,H)/2 - 6;
+  const cell = R * HEX.cell * 1.04;
+  for(let i=0;i<HEX.pts.length && i<vals.length;i++){
+    const x = W/2 + HEX.pts[i][0]*R, y = H/2 + HEX.pts[i][1]*R;
+    ctx.beginPath();
+    for(let k=0;k<6;k++){
+      const a = Math.PI/180*(60*k);
+      const px = x + cell*Math.cos(a), py = y + cell*Math.sin(a);
+      k ? ctx.lineTo(px,py) : ctx.moveTo(px,py);
+    }
+    ctx.closePath();
+    ctx.fillStyle = lum(vals[i]); ctx.fill();
+  }
+}
+
+// ---- сырой вид SS13 -------------------------------------------------------
+function drawView(img,w,h){
+  const c = $('#view'), ctx = c.getContext('2d');
+  c.width = w*10; c.height = h*10;
+  ctx.fillStyle='#080a0f'; ctx.fillRect(0,0,c.width,c.height);
+  if(!img.length) return;
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+    ctx.fillStyle = lum(img[y*w+x]);
+    ctx.fillRect(x*10,y*10,10,10);
+  }
+  // муха всегда в центре, смотрит вверх
+  ctx.strokeStyle='#7ee0b8'; ctx.lineWidth=1.5;
+  const cx=(w>>1)*10+5, cy=(h>>1)*10+5;
+  ctx.beginPath(); ctx.moveTo(cx,cy+5); ctx.lineTo(cx,cy-7);
+  ctx.moveTo(cx-3,cy-3); ctx.lineTo(cx,cy-7); ctx.lineTo(cx+3,cy-3); ctx.stroke();
+}
+
+// ---- растр ----------------------------------------------------------------
+const BANDCOL = ['#f0b352', '#7ee0b8', '#8ab4ff'];
+// history — массив кадров, в каждом только индексы спайкнувших нейронов
+function drawRaster(history, rows, bands){
+  const c = $('#raster'), ctx = c.getContext('2d');
+  ctx.fillStyle='#080a0f'; ctx.fillRect(0,0,c.width,c.height);
+  const n = history ? history.length : 0;
+  rows = rows || 1024;
+  const cols = 160, cw = c.width / cols, ch = c.height / rows;
+  bands = bands || [{name:'', start:0, end:rows}];
+
+  // фон полос и подписи
+  ctx.font='9px monospace'; ctx.textBaseline='top';
+  bands.forEach((b,k)=>{
+    const y0=b.start*ch, y1=b.end*ch;
+    ctx.fillStyle = k%2 ? 'rgba(255,255,255,0.018)' : 'rgba(255,255,255,0.045)';
+    ctx.fillRect(0,y0,c.width,y1-y0);
+    if(b.name && y1-y0 > 14){
+      ctx.fillStyle='#5d6b7e'; ctx.fillText(b.name, 5, y0+3);
+    }
+  });
+
+  ctx.globalAlpha = 0.85;
+  for(let t=0;t<n;t++){
+    const spikes = history[t], x = (cols-n+t)*cw;
+    for(let j=0;j<spikes.length;j++){
+      const i = spikes[j];
+      let ci = 1;
+      for(let k=0;k<bands.length;k++) if(i>=bands[k].start && i<bands[k].end) ci=k;
+      ctx.fillStyle = BANDCOL[ci] || '#7ee0b8';
+      ctx.fillRect(x, i*ch, Math.max(1.5,cw), Math.max(1.5,ch));
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ---- компас ---------------------------------------------------------------
+function drawCompass(heading, move){
+  const c = $('#compass'), ctx = c.getContext('2d');
+  ctx.clearRect(0,0,c.width,c.height);
+  const cx=c.width/2, cy=c.height/2+6, R=44;
+  ctx.strokeStyle='#1f2836'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.stroke();
+  ctx.fillStyle='#7f8da0'; ctx.font='10px monospace'; ctx.textAlign='center';
+  ctx.textBaseline='middle';
+  [['С',0],['В',90],['Ю',180],['З',270]].forEach(([t,a])=>{
+    const r=(a-90)*Math.PI/180;
+    ctx.fillText(t, cx+Math.cos(r)*(R+10), cy+Math.sin(r)*(R+10));
+  });
+  const r=(heading-90)*Math.PI/180;
+  ctx.strokeStyle = move>0 ? '#7ee0b8' : (move<0 ? '#f0b352' : '#4a5568');
+  ctx.lineWidth=3; ctx.beginPath();
+  ctx.moveTo(cx,cy); ctx.lineTo(cx+Math.cos(r)*R*0.86, cy+Math.sin(r)*R*0.86); ctx.stroke();
+}
+
+// ---- график производительности --------------------------------------------
+function drawPerf(mean, wall){
+  const c=$('#perf'), ctx=c.getContext('2d');
+  ctx.fillStyle='#080a0f'; ctx.fillRect(0,0,c.width,c.height);
+  function line(arr, color, label){
+    if(!arr || arr.length<2) return 0;
+    const max = Math.max(1e-6, ...arr) * 1.25;    // автомасштаб под свои данные
+    ctx.strokeStyle=color; ctx.lineWidth=1.5; ctx.beginPath();
+    arr.forEach((v,i)=>{
+      const x=i/(arr.length-1)*c.width, y=c.height-(v/max)*(c.height-14)-4;
+      i?ctx.lineTo(x,y):ctx.moveTo(x,y);
+    });
+    ctx.stroke();
+    ctx.fillStyle=color; ctx.font='9px monospace'; ctx.textBaseline='top';
+    ctx.fillText(label(max), 4, label.y||3);
+    return max;
+  }
+  const l1 = t=>`реальных мс, шкала ${t.toFixed(0)}`;
+  const l2 = t=>`Гц по мозгу, шкала ${t.toFixed(2)}`; l2.y = 15;
+  line(wall, '#f0b352', l1);
+  line(mean, '#7ee0b8', l2);
+}
+
+// ---- вспомогательные строки ------------------------------------------------
+function bars(el, entries, scale, opts){
+  el.innerHTML = entries.map(([k,v])=>{
+    const pct = Math.max(0, Math.min(100, (v/scale)*100));
+    const cls = opts && opts.hot && v>=opts.hot ? 'hot' : (v<0?'neg':'');
+    return `<div class="dnrow"><span>${k}</span>
+      <span class="bar"><i class="${cls}" style="width:${pct}%"></i></span>
+      <span>${v.toFixed(opts&&opts.digits!==undefined?opts.digits:1)}</span></div>`;
+  }).join('');
+}
+
+// ---- мозг в трёх измерениях ------------------------------------------------
+// Точки — настоящие координаты сомы из выгрузки FlyWire. Тусклая масса это
+// форма мозга, цветные точки — отслеживаемая растром выборка, вспыхивают
+// ровно те, что спайкнули в этом тике. Ничего не додумывается: дорисованной
+// "активности для красоты" здесь нет.
+const CLOUD = {
+  shape: null, live: null, band: null, bands: [], ready: false,
+  yaw: 0.0, pitch: -0.18, spin: 0.0032, drag: null, spikes: null, real: true,
+};
+const BANDCOL3 = ['#f0b352', '#7ee0b8', '#8ab4ff'];
+
+function fitCanvas(c){
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const w = Math.max(160, c.clientWidth), h = Math.round(w * 0.74);
+  if(c.width !== Math.round(w*dpr) || c.height !== Math.round(h*dpr)){
+    c.width = Math.round(w*dpr); c.height = Math.round(h*dpr);
+    c.style.height = h + 'px';
+  }
+  return dpr;
+}
+
+function project(buf, i, cy, sy, cp, sp, out){
+  const x = buf[i], y = buf[i+1], z = buf[i+2];
+  const x1 =  x*cy + z*sy;
+  const z1 = -x*sy + z*cy;
+  const y2 =  y*cp - z1*sp;
+  const z2 =  y*sp + z1*cp;
+  const s = 2.6 / (2.6 - z2*0.55);          // лёгкая перспектива
+  out[0] = x1*s; out[1] = y2*s; out[2] = z2;
+  return out;
+}
+
+const _p = [0,0,0];
+function drawCloud(){
+  const c = $('#cloud'); if(!c) return;
+  const dpr = fitCanvas(c), ctx = c.getContext('2d');
+  const W = c.width, H = c.height;
+  ctx.fillStyle = '#070910'; ctx.fillRect(0,0,W,H);
+  if(!CLOUD.ready){ return; }
+  const cx = W/2, cyp = H/2, R = Math.min(W,H) * 0.40;
+  const cy = Math.cos(CLOUD.yaw), sy = Math.sin(CLOUD.yaw);
+  const cp = Math.cos(CLOUD.pitch), sp = Math.sin(CLOUD.pitch);
+
+  // тусклый силуэт: одним цветом, без сортировки — глубину передаёт размер
+  const sh = CLOUD.shape;
+  ctx.fillStyle = 'rgba(125,150,190,0.16)';
+  for(let i=0;i<sh.length;i+=3){
+    project(sh, i, cy, sy, cp, sp, _p);
+    const px = cx + _p[0]*R, py = cyp - _p[1]*R;
+    const s = _p[2] > 0 ? 1.6*dpr : 1.0*dpr;
+    ctx.fillRect(px, py, s, s);
+  }
+
+  // отслеживаемые нейроны
+  const lv = CLOUD.live, bd = CLOUD.band, hit = CLOUD.spikes;
+  const bright = [];
+  for(let i=0,j=0;i<lv.length;i+=3,j++){
+    project(lv, i, cy, sy, cp, sp, _p);
+    const px = cx + _p[0]*R, py = cyp - _p[1]*R;
+    if(hit && hit.has(j)){ bright.push(px, py, bd[j]); continue; }
+    ctx.fillStyle = 'rgba(160,185,220,0.28)';
+    ctx.fillRect(px, py, 1.4*dpr, 1.4*dpr);
+  }
+  // спайкнувшие — поверх всего, с ореолом
+  for(let k=0;k<bright.length;k+=3){
+    const px = bright[k], py = bright[k+1], col = BANDCOL3[bright[k+2]] || '#7ee0b8';
+    ctx.globalAlpha = 0.20; ctx.fillStyle = col;
+    ctx.beginPath(); ctx.arc(px, py, 4.2*dpr, 0, 6.2832); ctx.fill();
+    ctx.globalAlpha = 1; ctx.fillStyle = col;
+    ctx.beginPath(); ctx.arc(px, py, 1.5*dpr, 0, 6.2832); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function bindDrag(c, st){
+  const down = e => { st.drag = {x:e.clientX, y:e.clientY, yaw:st.yaw, pitch:st.pitch};
+                      e.preventDefault(); };
+  const move = e => {
+    if(!st.drag) return;
+    st.yaw = st.drag.yaw + (e.clientX - st.drag.x) * 0.008;
+    st.pitch = Math.max(-1.3, Math.min(1.3,
+                 st.drag.pitch - (e.clientY - st.drag.y) * 0.008));
+  };
+  const up = () => { st.drag = null; };
+  c.addEventListener('mousedown', down);
+  window.addEventListener('mousemove', move);
+  window.addEventListener('mouseup', up);
+  c.addEventListener('touchstart', e => down(e.touches[0]), {passive:false});
+  c.addEventListener('touchmove', e => { move(e.touches[0]); e.preventDefault(); },
+                     {passive:false});
+  c.addEventListener('touchend', up);
+}
+
+let cloudAsked = false;
+async function loadCloud(id){
+  if(cloudAsked) return;
+  cloudAsked = true;
+  try{
+    const r = await fetch('/viz/cloud' + (id ? `?id=${encodeURIComponent(id)}` : ''));
+    const d = await r.json();
+    CLOUD.shape = Float32Array.from(d.shape.flat());
+    CLOUD.live  = Float32Array.from(d.live.flat());
+    CLOUD.band  = Int8Array.from(d.band);
+    CLOUD.bands = d.bands || [];
+    CLOUD.real  = d.real_coords !== false;
+    CLOUD.ready = true;
+    $('#cloudcap').innerHTML = CLOUD.real
+      ? `${(d.neurons||0).toLocaleString('ru')} нейронов · координаты сомы из выгрузки ·
+         подсвечено ${CLOUD.band.length}`
+      : `координат в выгрузке нет — форма условная, подсветка настоящая`;
+  }catch(e){
+    cloudAsked = false;
+    $('#cloudcap').textContent = 'координаты не загрузились';
+  }
+}
+
+// ---- муха в трёх измерениях ------------------------------------------------
+// Это отрисовка РЕШЕНИЯ, а не физическая модель тела: суставов, масс и сил
+// здесь нет. Показывает ровно то, что ушло в игру: куда развёрнута, идёт ли,
+// вперёд или назад, и какой поведенческий акт сейчас выполняется.
+const FLY = {heading:0, move:0, run:0, act:null, state:'', gait:0, pro:0,
+             groom:0, buzz:0, yaw:-0.62, pitch:1.00, drag:null};
+
+// Координаты мухи: x вправо, y вперёд, z вверх. Камера смотрит сверху под
+// углом pitch: 0 — строго сверху, pi/2 — сбоку.
+function flyPt(x, y, z, yaw, R, cx, cyp){
+  const c = Math.cos(yaw), s = Math.sin(yaw);
+  const x1 =  x*c + y*s;
+  const y1 = -x*s + y*c;
+  const cp = Math.cos(FLY.pitch), sp = Math.sin(FLY.pitch);
+  return [cx + x1*R, cyp - (y1*cp + z*sp)*R];
+}
+
+function ellipse(ctx, p, rx, ry, fill, stroke){
+  ctx.beginPath();
+  ctx.ellipse(p[0], p[1], Math.max(rx,0.5), Math.max(ry,0.5), 0, 0, 6.2832);
+  ctx.fillStyle = fill; ctx.fill();
+  if(stroke){ ctx.strokeStyle = stroke; ctx.lineWidth = 1; ctx.stroke(); }
+}
+
+function drawFly(){
+  const c = $('#fly3d'); if(!c) return;
+  const dpr = fitCanvas(c), ctx = c.getContext('2d');
+  const W = c.width, H = c.height;
+  const g = ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,'#0b1018'); g.addColorStop(1,'#131a24');
+  ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+
+  const R = Math.min(W,H) * 0.62;
+  const cx = W/2, cyp = H*0.58;
+  const yaw = FLY.yaw + FLY.heading * Math.PI / 180;
+  const P = (x,y,z) => flyPt(x, y, z, yaw, R, cx, cyp);
+
+  // пол: сетка в координатах мухи, чтобы поворот было видно
+  ctx.strokeStyle = 'rgba(125,150,190,0.13)'; ctx.lineWidth = 1;
+  for(let i=-3;i<=3;i++){
+    const a = P(i*0.33, -1.1, 0), b = P(i*0.33, 1.1, 0);
+    const d = P(-1.1, i*0.33, 0), e = P(1.1, i*0.33, 0);
+    ctx.beginPath(); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]);
+    ctx.moveTo(d[0],d[1]); ctx.lineTo(e[0],e[1]); ctx.stroke();
+  }
+
+  const lift = FLY.act === 'escape' ? 0.12 : 0;
+  const bob = FLY.move ? Math.sin(FLY.gait*2) * 0.012 : 0;
+  const z0 = 0.20 + lift + bob;
+
+  // тень: круг на полу проецируется в эллипс, сплюснутый по cos наклона
+  const sh = P(0,-0.06,0);
+  ctx.globalAlpha = 0.34 - lift;
+  ellipse(ctx, sh, 0.30*R, 0.30*R*Math.cos(FLY.pitch), '#000');
+  ctx.globalAlpha = 1;
+
+  // Лапки. Трипод: L1,R2,L3 в фазе, R1,L2,R3 в противофазе — так ходят
+  // насекомые, три опоры на земле в любой момент. Рисуем в два захода:
+  // дальние до тела, ближние после, иначе половина лапок уходит под брюшко.
+  const dirSign = FLY.move < 0 ? -1 : 1;
+  ctx.lineCap = 'round';
+  const legs = [];
+  for(let side=-1;side<=1;side+=2){
+    for(let li=0;li<3;li++){
+      const y0 = [0.17, 0.01, -0.15][li];
+      const tripod = ((side < 0 ? 0 : 1) + li) % 2;
+      const ph = FLY.gait + tripod * Math.PI;
+      const swing = FLY.move ? Math.sin(ph) * 0.12 * dirSign : 0;
+      const rise  = FLY.move ? Math.max(0, Math.cos(ph)) * 0.05 : 0;
+      const grooming = (FLY.act === 'groom' && li === 0);
+      const hip = P(side*0.10, y0, z0 - 0.02);
+      const reach = [0.24, 0.26, 0.28][li];
+      const kneeX = side * (grooming ? 0.12 : reach * 0.75);
+      const kneeY = grooming ? 0.24 + Math.sin(FLY.groom)*0.04 : y0 + swing*0.5;
+      const kneeZ = grooming ? z0 + 0.14 : z0 + 0.07 + rise;
+      const knee = P(kneeX, kneeY, kneeZ);
+      const footX = side * (grooming ? 0.04 : reach);
+      const footY = grooming ? 0.30 + Math.sin(FLY.groom)*0.05 : y0 + swing;
+      const footZ = grooming ? z0 + 0.18 : rise;   // 0 = стоит на полу
+      const foot = P(footX, footY, footZ);
+      legs.push({hip, knee, foot, depth: hip[1]});
+    }
+  }
+  legs.sort((a,b)=>a.depth-b.depth);
+  const bodyDepth = P(0,-0.05,z0)[1];
+  const drawLeg = L => {
+    ctx.strokeStyle = 'rgba(196,150,96,0.92)';
+    ctx.lineWidth = 2.1*dpr;
+    ctx.beginPath(); ctx.moveTo(L.hip[0],L.hip[1]);
+    ctx.lineTo(L.knee[0],L.knee[1]); ctx.lineTo(L.foot[0],L.foot[1]); ctx.stroke();
+  };
+  legs.filter(L => L.depth <= bodyDepth).forEach(drawLeg);
+
+  // Крылья. Как и лапки, сортируем по глубине: дальнее под тело, ближнее
+  // поверх — иначе видно только одно.
+  const spread = FLY.act === 'threat' ? 0.5 : 0.12;
+  const buzz = FLY.buzz > 0 ? Math.sin(FLY.gait*6)*0.08 : 0;
+  const wings = [];
+  for(let side=-1;side<=1;side+=2){
+    const a = P(side*0.05, 0.06, z0+0.12);
+    const b = P(side*(0.16+spread), -0.42, z0+0.10+buzz);
+    const m = P(side*(0.20+spread), -0.16, z0+0.15+buzz);
+    wings.push({a, b, m, depth: m[1]});
+  }
+  const drawWing = w => {
+    ctx.beginPath(); ctx.moveTo(w.a[0],w.a[1]);
+    ctx.quadraticCurveTo(w.m[0],w.m[1], w.b[0],w.b[1]);
+    ctx.quadraticCurveTo((w.m[0]+w.a[0])/2, (w.m[1]+w.b[1])/2, w.a[0],w.a[1]);
+    ctx.fillStyle = 'rgba(190,215,245,0.17)'; ctx.fill();
+    ctx.strokeStyle = 'rgba(190,215,245,0.32)'; ctx.lineWidth = 1; ctx.stroke();
+  };
+  wings.sort((x,y)=>x.depth-y.depth);
+  drawWing(wings[0]);
+
+  // Тело. Порядок отрисовки — по экранной глубине: чем ниже на экране,
+  // тем ближе к зрителю. Иначе при взгляде сзади брюшко оказывается
+  // "за" головой и муха выворачивается наизнанку.
+  const parts = [
+    [P(0,-0.28,z0+0.02), 0.155, 0.115, '#8a6330'],   // брюшко
+    [P(0,-0.05,z0+0.05), 0.150, 0.125, '#a2762f'],   // грудь
+    [P(0, 0.20,z0+0.05), 0.115, 0.100, '#b8863a'],   // голова
+    [P(-0.085, 0.245, z0+0.07), 0.072, 0.062, '#c8412f'],
+    [P( 0.085, 0.245, z0+0.07), 0.072, 0.062, '#c8412f'],
+  ].sort((a,b) => a[0][1] - b[0][1]);
+  parts.forEach(pt =>
+    ellipse(ctx, pt[0], pt[1]*R, pt[2]*R, pt[3], 'rgba(0,0,0,0.5)'));
+
+  drawWing(wings[1]);
+  legs.filter(L => L.depth > bodyDepth).forEach(drawLeg);
+
+  // хоботок
+  if(FLY.pro > 0.01){
+    const a = P(0, 0.26, z0+0.01);
+    const b = P(0, 0.26 + 0.16*FLY.pro, z0 + 0.01 - 0.09*FLY.pro);
+    ctx.strokeStyle = '#e2a457'; ctx.lineWidth = 3.4*dpr;
+    ctx.beginPath(); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.stroke();
+    ellipse(ctx, b, 0.030*R, 0.026*R, '#f0c184');
+  }
+
+  // подпись состояния
+  ctx.fillStyle = 'rgba(215,224,238,0.85)';
+  ctx.font = `${11*dpr}px ui-monospace,monospace`;
+  ctx.fillText(FLY.state || '—', 10*dpr, 18*dpr);
+}
+
+function tick3d(){
+  if(!CLOUD.drag) CLOUD.yaw += CLOUD.spin;
+  if(FLY.move) FLY.gait += 0.42;
+  else FLY.gait += 0.03;
+  const wantPro = FLY.act === 'eat' ? 1 : 0;
+  FLY.pro += (wantPro - FLY.pro) * 0.22;
+  if(FLY.act === 'groom') FLY.groom += 0.5;
+  FLY.buzz = Math.max(0, FLY.buzz - 0.04);
+  drawCloud(); drawFly();
+  requestAnimationFrame(tick3d);
+}
+
+// Панель нисходящих нейронов. Полоса — z-оценка, центрирована на нуле,
+// с отметками порогов. Сырые герцы стоят рядом мелким шрифтом: у groom их
+// в разы больше, чем у остальных, просто потому что популяция крупнее, и
+// если рисовать полосу по герцам, groom "на максимуме" всегда.
+const Z_SPAN = 4.0;                    // на что растянут масштаб
+function dnPanel(el, entries, zmap, state, thr){
+  const act = (thr && thr.act) || 1.8, esc = (thr && thr.escape) || 2.4;
+  const mark = z => 50 + (z / Z_SPAN) * 50;
+  el.innerHTML = entries.map(([k, hz])=>{
+    const z = (zmap[k] === undefined) ? 0 : zmap[k];
+    const c = Math.max(0, Math.min(100, mark(z)));
+    const left = Math.min(50, c), w = Math.abs(c - 50);
+    const win = STATE_OF[k] === state;
+    const cls = win ? 'win' : (z < 0 ? 'neg' : '');
+    const t = k === 'escape' ? esc : act;
+    return `<div class="zrow${win?' win':''}"><span>${k}</span>
+      <span class="zbar"><i class="mid"></i>
+        <i class="thr" style="left:${mark(t)}%"></i>
+        <i class="thr" style="left:${mark(-t)}%"></i>
+        <i class="fill ${cls}" style="left:${left}%;width:${Math.max(w,0.6)}%"></i>
+      </span>
+      <span class="znum"><b>z${z>=0?'+':''}${z.toFixed(2)}</b> <s>${hz.toFixed(1)} Гц</s></span>
+    </div>`;
+  }).join('');
+}
+// какое состояние декодера соответствует какому каналу — чтобы подсветить
+// тот, который сейчас действительно правит поведением
+const STATE_OF = {escape:'escape', threat:'threat', backward:'backward',
+                  groom:'groom', feed:'feed', forward:'forward'};
+
+// ---- приём кадров ----------------------------------------------------------
+function render(f){
+  if(f.tick === lastTick) return;
+  lastTick = f.tick;
+  $('#hdr').textContent =
+    `${f.id} · тик ${f.tick} · мозгового времени ${f.brain_ms} мс на тик`;
+  drawHex(f.hex||[]);
+  drawView(f.image||[], f.view_w||15, f.view_h||15);
+  // полный кадр заменяет историю, обычный — дописывает столбец
+  if(f.raster_full) rasterHist = (f.raster||[]).slice();
+  else (f.raster||[]).forEach(col => rasterHist.push(col));
+  while(rasterHist.length > 160) rasterHist.shift();
+  drawRaster(rasterHist, f.raster_rows, f.bands);
+
+  // 3D-панель подсвечивает ровно тех, кто спайкнул в последнем столбце
+  // растра: два вида на одни и те же данные, а не два разных источника.
+  loadCloud(f.id);
+  const lastCol = rasterHist.length ? rasterHist[rasterHist.length-1] : null;
+  CLOUD.spikes = lastCol ? new Set(lastCol) : null;
+
+  const dn = Object.entries(f.dn||{})
+                   .filter(([k])=>!['dn_all','dn_left','dn_right'].includes(k)
+                                  && !k.startsWith('vis_'));
+  const eyes = f.dn||{};
+  const zmap = (f.z && f.z.z) || {};
+  const st = (f.z && f.z.state) || '—';
+  dnPanel($('#dn'), dn, zmap, st, f.thresholds);
+
+  $('#state').textContent = st;
+  const a = f.action || {};
+  const mv = a.move|0, DIRNAME={1:'север',2:'юг',4:'восток',8:'запад'};
+
+  // 3D-муха показывает ровно ту команду, которая ушла в игру
+  if(FLY.act !== 'escape' && a.act === 'escape') FLY.buzz = 1;
+  FLY.heading = (f.z && f.z.heading) || 0;
+  FLY.move = mv; FLY.run = a.run|0; FLY.act = a.act || null; FLY.state = st;
+  $('#flycap').textContent =
+    `${DIRNAME[a.dir]||'—'} · ${mv>0?'шаг вперёд':(mv<0?'задний ход':'на месте')}`
+    + `${a.run?' · бег':''}${a.act?' · '+a.act:''} · курс ${Math.round(FLY.heading)}°`;
+
+  const src = (f.z && f.z.source) || 'мозг';
+  const fromBrain = (src === 'мозг' || src === 'шум DN');
+  $('#pills').innerHTML =
+    `<span class="pill src${fromBrain?'':' fb'}">рулит: ${src}</span>
+     <span class="pill">${DIRNAME[a.dir]||'—'}</span>
+     <span class="pill">${mv>0?'шаг вперёд':(mv<0?'задний ход':'на месте')}</span>
+     <span class="pill">${a.run?'бег':'шагом'}</span>
+     <span class="pill">тяга ${(f.z&&f.z.arousal!=null)?f.z.arousal.toFixed(2):'—'}</span>` +
+    (a.act?`<span class="pill">${a.act}</span>`:'');
+
+  // Молчащая моторика — главная причина «муха идёт в одну сторону и всё».
+  // Пока это не видно, кажется, что модель работает.
+  const silent = (f.z && f.z.brain_silent_for) || 0;
+  const banner = $('#banner');
+  if(silent > 25){
+    banner.style.display = 'block';
+    const d = f.diag || {};
+    const cfg = d.config ? `конфиг: <code>${d.config}</code>` :
+      `<b>конфиг не найден</b> — значения по умолчанию, подобранный свипом weight_scale не применён`;
+    const tail = d.fix
+      ? `<br>Причина: <b>${d.cause}</b>. ${d.fix.replace(/python3 [^\s]+( --[^\s]+)*/g, m => '<code>'+m+'</code>')}`
+      : `<br>Подобрать рабочую точку: <code>python3 scripts/calibrate.py --sweep</code>.`;
+    banner.innerHTML =
+      `<b>Команды нисходящих нейронов молчат ${silent} ${plural(silent,'тик','тика','тиков')} подряд.</b> `
+      + (fromBrain ? `Курс пока держится сам. ` : `Рулит резервный контур (${src}), а не модель мозга. `)
+      + tail
+      + `<br><span style="opacity:.75">weight_scale = ${d.weight_scale!=null?d.weight_scale:'?'}, `
+      + `средняя частота ${d.mean_hz!=null?d.mean_hz:'?'} Гц, тормоз ${d.inhib_mv!=null?d.inhib_mv:'?'} мВ, ${cfg}`
+      + (d.empty && d.empty.length ? `, пустые каналы: ${d.empty.join(', ')}` : '')
+      + `</span>`;
+  } else {
+    banner.style.display = 'none';
+  }
+  drawCompass((f.z&&f.z.heading)||0, a.move||0);
+
+  // Внутренние состояния: без них непонятно, почему муха вдруг пошла в бар
+  const inner = f.inner || {};
+  const dirt = inner['грязь'] || {};
+  const rows = Object.entries(inner).filter(([k])=>k !== 'грязь')
+    .map(([k,v])=>`<div class="kv"><span>${k}</span><b>${v}</b></div>`).join('');
+  const dirtRows = Object.entries(dirt).length
+    ? `<div class="kv"><span>грязь</span><b>${
+        Object.entries(dirt).map(([k,v])=>`${k} ${v}`).join(', ')}</b></div>`
+    : '';
+  $('#inner').innerHTML = rows + dirtRows;
+
+  const dr = Object.entries(f.drive||{});
+  bars($('#drive'), dr, 1.0, {digits:2, hot:0.8});
+
+  const pc = Object.entries(f.percept||{});
+  $('#percept').innerHTML = pc.length
+    ? pc.map(([k,v])=>`<div class="kv"><span>${k}</span><b>${v}</b></div>`).join('')
+    : '<span style="color:var(--dim);font-size:11px">нет данных</span>';
+
+  perfHist = f.wall_ms || [];
+  drawPerf(f.mean_hz||[], perfHist);
+  const last = perfHist.length ? perfHist[perfHist.length-1] : 0;
+  const mh = (f.mean_hz||[]).slice(-1)[0] || 0;
+  const cm = (f.z && f.z.common != null) ? f.z.common : null;
+  $('#perfkv').innerHTML =
+    `<div class="kv"><span>реальных мс на тик</span><b>${last.toFixed(0)}</b></div>
+     <div class="kv"><span>средняя частота по мозгу</span><b>${mh.toFixed(2)} Гц</b></div>`
+    + (cm!==null?`<div class="kv"><span>вычтенная общая мода</span><b>${cm.toFixed(2)} z</b></div>`:'');
+  const brain = f.brain || {};
+  const eyeTxt = (eyes.vis_left!=null && eyes.vis_right!=null)
+    ? ` · глаза ${eyes.vis_left.toFixed(0)}/${eyes.vis_right.toFixed(0)} Гц` : '';
+  $('#spikeinfo').textContent =
+    `спайков за тик: ${brain.spikes ?? '—'} · тормозной ток ${brain.inhib_mv ?? 0} мВ`
+    + eyeTxt;
+  $('#clip').textContent = brain.clipped ? 'СРАБОТАЛА ЗАЩИТА ОТ РАЗГОНА' : '';
+  $('#clip').style.color = brain.clipped ? 'var(--hot)' : 'var(--dim)';
+}
+
+// ---- поток -----------------------------------------------------------------
+const params = new URLSearchParams(location.search);
+const id = params.get('id');
+
+// Обычный режим — поток событий. ?poll=1 переключает на опрос: пригодится,
+// если между вами и демоном стоит прокси, который режет event-stream.
+let polledOnce = false;
+function poll(){
+  let u = '/viz/frame?full=' + (polledOnce ? '0' : '1');
+  if(id) u += '&id=' + encodeURIComponent(id);
+  polledOnce = true;
+  fetch(u).then(r=>r.json()).then(render)
+          .catch(()=>{ $('#hdr').textContent='связь потеряна…'; });
+}
+
+function connect(){
+  if(params.get('poll') || typeof EventSource === 'undefined'){
+    poll(); setInterval(poll, 250); return;
+  }
+  const es = new EventSource('/viz/stream' + (id?`?id=${encodeURIComponent(id)}`:''));
+  es.onmessage = e => { try{ render(JSON.parse(e.data)); }catch(_){} };
+  es.onerror = () => { es.close(); $('#hdr').textContent='связь потеряна, переподключаюсь…';
+                       setTimeout(connect, 1500); };
+}
+bindDrag($('#cloud'), CLOUD);
+bindDrag($('#fly3d'), FLY);
+window.addEventListener('resize', () => { drawCloud(); drawFly(); });
+requestAnimationFrame(tick3d);
+connect();
+</script>
+</body>
+</html>

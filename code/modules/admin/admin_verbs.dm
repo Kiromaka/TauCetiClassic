@@ -129,7 +129,10 @@ var/global/list/admin_verbs_fun = list(
 	/client/proc/toggle_AI_interact, //toggle admin ability to interact with machines as an AI,
 	/client/proc/centcom_barriers_toggle,
 	/client/proc/gateway_toggle,
-	/client/proc/repaint_area_windows
+	/client/proc/repaint_area_windows,
+	/client/proc/flybrain_spawn_fly,
+	/client/proc/flybrain_attach_existing,
+	/client/proc/flybrain_detach,
 	)
 var/global/list/admin_verbs_spawn = list(
 	/datum/admins/proc/spawn_atom,		//allows us to spawn instances,
@@ -199,6 +202,8 @@ var/global/list/admin_verbs_debug = list(
 	/client/proc/generate_fulltile_window_placeholders,
 	/client/proc/allow_browser_inspect,
 	/client/proc/mc_show_all_toggle,
+	/client/proc/flybrain_status,
+	/client/proc/flybrain_reload,
 #ifdef REFERENCE_TRACKING
 /client/proc/find_refs,
 /client/proc/qdel_then_find_references,

@@ -1,0 +1,33 @@
+services:
+  flybrain:
+    build: .
+    container_name: flybrain
+    restart: unless-stopped
+    ports:
+      # дашборд и приём тиков. Наружу порт лучше не выставлять:
+      # если BYOND крутится на этой же машине, хватит 127.0.0.1
+      - "127.0.0.1:5665:5665"
+    volumes:
+      - ./data:/app/data
+      - ./flybrain.json:/app/flybrain.json:ro
+    environment:
+      FLYBRAIN_SECRET: "${FLYBRAIN_SECRET:-change-me}"
+      FLYBRAIN_CONFIG: "/app/flybrain.json"
+      FLYBRAIN_BACKEND: "numpy"
+    # Коннектом целиком лежит в памяти: ~250 МБ на матрицу плюс
+    # ~2 МБ состояния на каждую муху
+    mem_limit: 2g
+
+  # Профиль demo: поднять муху на синтетическом коннектоме и погонять мок-станцию,
+  # чтобы посмотреть дашборд без данных FlyWire и без BYOND.
+  #   docker compose --profile demo up
+  demo:
+    build: .
+    profiles: ["demo"]
+    depends_on: [flybrain]
+    command: >
+      sh -c "sleep 20 &&
+             python3 tests/mock_ss13.py --url http://flybrain:5665
+             --secret $${FLYBRAIN_SECRET:-change-me} --ticks 400 --hz 5"
+    environment:
+      FLYBRAIN_SECRET: "${FLYBRAIN_SECRET:-change-me}"

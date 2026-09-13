@@ -1,0 +1,33 @@
+{
+  "_комментарий": "Конфиг питоновской стороны. Запуск: python3 -m flybrain.server --config flybrain.json",
+  "connectome_file": "data/connectome.npz",
+  "model": {
+    "gain": 0.65,
+    "w_synapse": 0.275,
+    "min_syn_count": 5,
+    "v_threshold": -45.0,
+    "v_rest": -52.0,
+    "tau_membrane": 20.0,
+    "tau_synapse": 5.0,
+    "t_refractory": 2.2,
+    "t_delay": 1.8
+  },
+  "runtime": {
+    "dt": 0.5,
+    "brain_ms_per_tick": 50.0,
+    "backend": "auto",
+    "device": "cpu",
+    "tick_budget_s": 0.18,
+    "adaptive": true,
+    "sensory_max_hz": 250.0,
+    "input_drive_mv": 14.0,
+    "homeostasis": true,
+    "target_rate_hz": 2.0,
+    "background_hz": 3.0
+  },
+  "server": {
+    "host": "127.0.0.1",
+    "port": 5665,
+    "secret": "change-me"
+  }
+}
